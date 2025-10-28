@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "SNS topic para notificaciones del proyecto"
+
+Parameters:
+  NotificationEmail:
+    Type: String
+
+Resources:
+  ProjectSnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: project-notifications
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref NotificationEmail
+
+Outputs:
+  SnsTopicArn:
+    Value: !Ref ProjectSnsTopic
+    Export:
+      Name: project-sns-topic

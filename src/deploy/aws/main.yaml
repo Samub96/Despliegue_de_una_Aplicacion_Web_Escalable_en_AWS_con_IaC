@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Stack maestro que referencia stacks hijos (usar TemplateURL con S3 o desplegar por separado)."
+
+Parameters:
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  AdminEmail:
+    Type: String
+  DBPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/vpc.yaml
+      Parameters:
+        VpcCidr: 10.0.0.0/16
+
+  RDSStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/rds.yaml
+      Parameters:
+        DBUsername: admin
+        DBPassword: !Ref DBPassword
+        DBName: appdb
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        DBSubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
+
+  EC2Stack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/ec2.yaml
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
+        KeyName: !Ref KeyName
+
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/alb.yaml
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
+        AppSecurityGroupId: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
+
+  AutoScalingStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/autoscaling.yaml
+      Parameters:
+        ImageId: ami-0c55b159cbfafe1f0
+        InstanceType: t3.micro
+        KeyName: !Ref KeyName
+        SecurityGroupIds: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
+        SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
+        TargetGroupArn: !GetAtt ALBStack.Outputs.TargetGroupArn
+
+  CloudWatchStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/cloudwatch.yaml
+      Parameters:
+        AutoScalingGroupName: !GetAtt AutoScalingStack.Outputs.AutoScalingGroupName
+        AlarmEmail: !Ref AdminEmail
+
+Outputs:
+  ALBDNS:
+    Value: !GetAtt ALBStack.Outputs.LoadBalancerDNS
+  RDSEndpoint:
+    Value: !GetAtt RDSStack.Outputs.RdsEndpoint

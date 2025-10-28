@@ -27,7 +27,17 @@ El caso de estudio plantea el lanzamiento de una plataforma de **comercio electr
 │   │   └── 📝 README.md
 │   ├── 📁 deploy
 │   │   ├── 📁 aws-deploy
-│   │   └── 📁 on-premise-deploy
+|   │   ├── vpc.yaml             # Define VPC, subredes públicas y privadas
+|   │   ├── ec2.yaml             # Instancias, security groups, roles
+|   │   ├── rds.yaml             # Base de datos RDS
+|   │   ├── alb.yaml             # Load Balancer y Target Groups
+|   │   ├── autoscaling.yaml     # Configuración de Auto Scaling
+|   │   ├── cloudwatch.yaml      # Alarmas y monitoreo
+|   │   ├── sns.yaml             # Notificaciones
+|   │   └── main.yaml     
+│   ├── 📁 on-premise-deploy
+|   |   ├── docker-compose.yaml  #  versión local para pruebas
+|   |   └── setup.sh          
 │   └── 📁 frontend
 │       ├── 📝 README.md
 │       ├── 🌐 index.html
