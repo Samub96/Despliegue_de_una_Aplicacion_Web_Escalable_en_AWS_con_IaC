@@ -48,7 +48,7 @@ Resources:
           GroupSet:
             - !Ref AppSecurityGroup
 
-     
+      # 🚀 Sin IamInstanceProfile (bloqueado en sandbox)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -58,7 +58,7 @@ Resources:
 
           # === Clonar el repositorio ===
           cd /home/ec2-user
-          git clone https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC
+          git clone https://github.com/<TU_USUARIO>/<TU_REPO>.git proyecto
           cd proyecto/src/backend
 
           # === Instalar dependencias ===
