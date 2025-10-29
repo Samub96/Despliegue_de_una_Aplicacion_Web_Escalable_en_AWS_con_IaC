@@ -14,14 +14,14 @@ Resources:
   VPCStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/vpc.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/vpc.yaml
       Parameters:
         VpcCidr: 10.0.0.0/16
 
   RDSStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/rds.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/rds.yaml
       Parameters:
         DBUsername: admin
         DBPassword: !Ref DBPassword
@@ -32,7 +32,7 @@ Resources:
   EC2Stack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/ec2.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/ec2.yaml
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
@@ -41,7 +41,7 @@ Resources:
   ALBStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/alb.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/alb.yaml
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
@@ -50,9 +50,9 @@ Resources:
   AutoScalingStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/autoscaling.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/autoscaling.yaml
       Parameters:
-        ImageId: ami-0c55b159cbfafe1f0
+        ImageId: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
         InstanceType: t3.micro
         KeyName: !Ref KeyName
         SecurityGroupIds: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
@@ -62,7 +62,7 @@ Resources:
   CloudWatchStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/YOUR_BUCKET/cloudwatch.yaml
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/cloudwatch.yaml
       Parameters:
         AutoScalingGroupName: !GetAtt AutoScalingStack.Outputs.AutoScalingGroupName
         AlarmEmail: !Ref AdminEmail

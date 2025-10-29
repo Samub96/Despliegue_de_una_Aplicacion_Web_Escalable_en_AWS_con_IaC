@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "EC2 base para ejecutar la aplicación (bastión + app) y roles"
+Description: "EC2 base para ejecutar la aplicación (bastión + app) sin roles IAM (sandbox compatible)"
 
 Parameters:
   VpcId:
@@ -20,7 +20,7 @@ Resources:
   AppSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP and SSH from bastion/ALB
+      GroupDescription: Allow HTTP and SSH
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
@@ -35,31 +35,6 @@ Resources:
         - Key: Name
           Value: app-sg
 
-  InstanceProfileRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: ec2.amazonaws.com
-            Action: sts:AssumeRole
-      Path: "/"
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
-      Tags:
-        - Key: Name
-          Value: ec2-role
-
-  InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - !Ref InstanceProfileRole
-      Path: "/"
-
   AppInstance:
     Type: AWS::EC2::Instance
     Properties:
@@ -72,7 +47,32 @@ Resources:
           SubnetId: !Select [0, !Ref PublicSubnetIds]
           GroupSet:
             - !Ref AppSecurityGroup
-      IamInstanceProfile: !Ref InstanceProfile
+
+     
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # === Configuración inicial ===
+          yum update -y
+          yum install -y git nodejs npm
+
+          # === Clonar el repositorio ===
+          cd /home/ec2-user
+          git clone https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC
+          cd proyecto/src/backend
+
+          # === Instalar dependencias ===
+          npm install -g pm2
+          npm install
+
+          # === Iniciar backend con PM2 ===
+          pm2 start server.js --name "backend"
+          pm2 startup systemd
+          pm2 save
+
+          # === Log ===
+          echo "Backend iniciado correctamente" > /home/ec2-user/startup.log
+
       Tags:
         - Key: Name
           Value: app-instance

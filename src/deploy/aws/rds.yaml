@@ -39,13 +39,14 @@ Resources:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
-          CidrIp: 10.0.0.0/16  # restrict inside VPC (adjust)
+          CidrIp: 10.0.0.0/16
       Tags:
         - Key: Name
           Value: project-db-sg
 
   RDSInstance:
     Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot   
     Properties:
       DBInstanceIdentifier: project-rds
       Engine: mysql
@@ -59,7 +60,6 @@ Resources:
       VPCSecurityGroups:
         - !Ref DBSecurityGroup
       DBSubnetGroupName: !Ref DBSubnetGroup
-      DeletionPolicy: Snapshot
 
 Outputs:
   RdsEndpoint:
