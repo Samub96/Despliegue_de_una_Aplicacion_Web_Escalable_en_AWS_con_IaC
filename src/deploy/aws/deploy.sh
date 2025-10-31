@@ -9,7 +9,7 @@
 STACK_NAME="ProyectoFinalStack"
 BUCKET="proyecto-final-samuel"
 REGION="us-east-1"
-KEY_PAIR="test"                      # ⚠️ Nombre del Key Pair registrado en AWS (sin .pem)
+KEY_PAIR="vockey"                      # ⚠️ Nombre del Key Pair registrado en AWS (sin .pem)
 ADMIN_EMAIL="samuel.barona@u.icesi.edu.co"      # ⚠️ Cambia por tu correo
 DB_PASSWORD="ProjFinal#2025"                   # ⚠️ Usa una contraseña segura
 TEMPLATES_PATH="templates"
