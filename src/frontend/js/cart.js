@@ -1,71 +1,75 @@
-// Maneja vista / acciones del carrito
+// frontend/js/cart.js
+const API_URL = "http://localhost:8080/api/cart";
+const token = localStorage.getItem('token');
+
+if (!token) {
+  alert("Debes iniciar sesión antes de acceder al carrito");
+  window.location.href = "login.html";
+}
+
 async function loadCart() {
-  const cartArea = document.getElementById('cartArea');
   try {
-    const items = await apiFetch('/cart', { headers: authHeaders() });
+    const res = await fetch(API_URL, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const items = await res.json();
+    console.log("🛍️ Carrito recibido:", items);
+
+    const cartContainer = document.getElementById("cartItems");
+    cartContainer.innerHTML = "";
+
     if (!items || items.length === 0) {
-      cartArea.innerHTML = '<p>Tu carrito está vacío.</p>';
-      document.getElementById('checkoutArea').innerHTML = '';
+      cartContainer.innerHTML = "<p>Tu carrito está vacío 🛒</p>";
+      document.getElementById("cartTotal").textContent = "$0";
       return;
     }
 
-    let rows = items.map(i => {
-      const p = i.Product;
-      const line = Number(p.price) * i.quantity;
-      return `<tr>
-        <td>${escapeHtml(p.name)}</td>
-        <td>$${Number(p.price).toFixed(2)}</td>
-        <td>${i.quantity}</td>
-        <td>$${line.toFixed(2)}</td>
-        <td><button class="btn" onclick="removeItem(${i.id})">Quitar</button></td>
-      </tr>`;
-    }).join('');
+    let total = 0;
+    items.forEach(item => {
+      const product = item.product;
+      if (!product) return;
 
-    const total = items.reduce((s,i)=> s + (i.Product.price * i.quantity), 0);
-    cartArea.innerHTML = `
-      <table style="width:100%;border-collapse:collapse">
-        <thead><tr><th>Producto</th><th>Precio</th><th>Cantidad</th><th>Total</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <h3>Total: $${Number(total).toFixed(2)}</h3>
-    `;
-    document.getElementById('checkoutArea').innerHTML = `<button class="btn" onclick="checkout()">Pagar</button>`;
+      const subtotal = product.price * item.quantity;
+      total += subtotal;
+
+      const div = document.createElement("div");
+      div.className = "product";
+      div.innerHTML = `
+        <img src="${product.image}" alt="${product.name}">
+        <h3>${product.name}</h3>
+        <p>Precio: $${product.price}</p>
+        <p>Cantidad: ${item.quantity}</p>
+        <button class="btn" onclick="removeFromCart(${product.id})">❌ Quitar</button>
+      `;
+      cartContainer.appendChild(div);
+    });
+
+    document.getElementById("cartTotal").textContent = `$${total.toFixed(2)}`;
   } catch (err) {
-    console.error('Error cargando carrito', err);
-    if (err && (err.error === 'no auth header' || err.error === 'invalid token')) {
-      cartArea.innerHTML = '<p>Debes <a href="login.html">iniciar sesión</a> para ver el carrito.</p>';
-    } else {
-      cartArea.innerHTML = '<p>Error cargando carrito.</p>';
-    }
+    console.error("❌ Error al cargar el carrito:", err);
+    alert("Error al cargar el carrito");
   }
 }
 
-async function removeItem(id) {
-  if (!confirm('¿Quitar este item del carrito?')) return;
+async function removeFromCart(productId) {
   try {
-    await apiFetch('/cart/remove', { method: 'POST', headers: authHeaders(), body: { id } });
-    await loadCart();
+    const res = await fetch(`${API_URL}/${productId}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const data = await res.json();
+    alert(data.message);
+    loadCart();
   } catch (err) {
-    console.error('Error al quitar item', err);
-    alert('No se pudo quitar el item.');
+    console.error("❌ Error al eliminar producto:", err);
   }
 }
 
 async function checkout() {
-  if (!confirm('Confirmar pago simulado del carrito?')) return;
-  try {
-    const res = await apiFetch('/checkout/process', { method: 'POST', headers: authHeaders() });
-    alert('Pago simulado correcto. Order ID: ' + res.orderId + ' — Total: $' + Number(res.total).toFixed(2));
-    await loadCart();
-  } catch (err) {
-    console.error('Error en checkout', err);
-    alert('Error en checkout: ' + (err.error || JSON.stringify(err)));
-  }
+  alert("✅ Simulación de pago completada. ¡Gracias por tu compra!");
+  // Aquí podrías limpiar el carrito en backend si lo deseas
 }
 
-function escapeHtml(str){
-  if (!str) return '';
-  return String(str).replace(/[&<>"']/g, s => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[s]);
-}
-
-window.addEventListener('load', loadCart);
+loadCart();
