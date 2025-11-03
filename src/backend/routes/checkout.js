@@ -1,45 +1,50 @@
+// backend/routes/checkout.js
 const express = require('express');
 const router = express.Router();
-const { CartItem, Product, Order } = require('../models');
-const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'secret';
+const auth = require('../middleware/auth');
+const { Cart, Product, Order } = require('../models');
 
-function auth(req, res, next) {
-    const header = req.headers.authorization;
-    if (!header) return res.status(401).json({ error: 'no auth header' });
+// 💳 Simular pago y guardar compra
+router.post('/', auth, async (req, res) => {
     try {
-        const token = header.split(' ')[1];
-        req.user = jwt.verify(token, JWT_SECRET);
-        next();
-    } catch {
-        res.status(401).json({ error: 'invalid token' });
+        const userId = req.user.id;
+
+        // Obtener los productos del carrito
+        const items = await Cart.findAll({
+            where: { userId },
+            include: [{ model: Product, as: 'productData' }]
+        });
+
+        if (!items.length) {
+            return res.status(400).json({ message: 'El carrito está vacío' });
+        }
+
+        // Calcular el total
+        const total = items.reduce(
+            (sum, item) => sum + (item.productData?.price || 0) * item.quantity,
+            0
+        );
+
+        // Guardar la orden
+        const order = await Order.create({
+            userId,
+            total,
+            details: items.map(i => ({
+                id: i.productData.id,
+                name: i.productData.name,
+                price: i.productData.price,
+                quantity: i.quantity
+            }))
+        });
+
+        // Vaciar carrito
+        await Cart.destroy({ where: { userId } });
+
+        res.json({ message: '✅ Compra simulada con éxito', order });
+    } catch (err) {
+        console.error('❌ Error en checkout:', err);
+        res.status(500).json({ message: 'Error al procesar la compra' });
     }
-}
-
-router.post('/process', auth, async (req, res) => {
-    const items = await CartItem.findAll({ where: { userId: req.user.id }, include: [Product] });
-    if (items.length === 0) return res.status(400).json({ error: 'Carrito vacío' });
-
-    const summary = items.map(i => ({
-        productId: i.Product.id,
-        name: i.Product.name,
-        quantity: i.quantity,
-        price: i.Product.price,
-        total: i.Product.price * i.quantity
-    }));
-
-    const total = summary.reduce((sum, i) => sum + i.total, 0);
-
-    const order = await Order.create({
-        userId: req.user.id,
-        itemsJson: JSON.stringify(summary),
-        total,
-        status: 'paid'
-    });
-
-    await CartItem.destroy({ where: { userId: req.user.id } });
-
-    res.json({ success: true, orderId: order.id, total });
 });
 
 module.exports = router;

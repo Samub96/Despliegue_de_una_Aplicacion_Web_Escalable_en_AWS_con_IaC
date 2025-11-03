@@ -1,24 +1,37 @@
-const sequelize = require('../config/database');
-const User = require('./user');
-const Product = require('./product');
-const CartItem = require('./cartItem');
-const Order = require('./order');
+// backend/models/index.js
+const { Sequelize, DataTypes } = require('sequelize');
+require('dotenv').config();
 
-const models = {
-    User: User(sequelize),
-    Product: Product(sequelize),
-    CartItem: CartItem(sequelize),
-    Order: Order(sequelize)
-};
+const sequelize = new Sequelize(
+    process.env.DB_NAME || 'ecommerce_db',
+    process.env.DB_USER || 'root',
+    process.env.DB_PASSWORD || '',
+    {
+        host: process.env.DB_HOST || 'localhost',
+        dialect: 'mysql',
+        logging: false,
+    }
+);
 
-// Relaciones
-models.User.hasMany(models.CartItem, { foreignKey: 'userId' });
-models.CartItem.belongsTo(models.User, { foreignKey: 'userId' });
+const db = {};
 
-models.Product.hasMany(models.CartItem, { foreignKey: 'productId' });
-models.CartItem.belongsTo(models.Product, { foreignKey: 'productId' });
+// Inicializar modelos
+db.User = require('./User')(sequelize, DataTypes);
+db.Product = require('./Product')(sequelize, DataTypes);
+db.Cart = require('./Cart')(sequelize, DataTypes);
+db.Order = require('./Order')(sequelize, DataTypes);
 
-models.User.hasMany(models.Order, { foreignKey: 'userId' });
-models.Order.belongsTo(models.User, { foreignKey: 'userId' });
+// 🔗 Asociaciones sin conflictos
+db.User.hasMany(db.Cart, { foreignKey: 'userId', as: 'cartItems' });
+db.Cart.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
 
-module.exports = { sequelize, ...models };
+db.Product.hasMany(db.Cart, { foreignKey: 'productId', as: 'cartEntries' });
+db.Cart.belongsTo(db.Product, { foreignKey: 'productId', as: 'productData' }); // 👈 CAMBIAMOS EL ALIAS
+
+db.User.hasMany(db.Order, { foreignKey: 'userId', as: 'orders' });
+db.Order.belongsTo(db.User, { foreignKey: 'userId', as: 'user' });
+
+db.Sequelize = Sequelize;
+db.sequelize = sequelize;
+
+module.exports = db;
