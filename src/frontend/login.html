@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Mi Tienda - Login</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="container header-nav">
+      <h1>Acceso</h1>
+      <nav>
+        <a class="btn" href="index.html">Catálogo</a>
+        <a class="btn" href="cart.html">Carrito</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section style="max-width:500px;margin:0 auto;">
+      <h2>Iniciar sesión</h2>
+      <form id="loginForm">
+        <label>Correo electrónico</label><br>
+        <input id="loginEmail" type="email" required><br><br>
+        <label>Contraseña</label><br>
+        <input id="loginPass" type="password" required><br><br>
+        <button class="btn" type="submit">Ingresar</button>
+      </form>
+
+      <hr>
+
+      <h2>Registro</h2>
+      <form id="regForm">
+        <label>Usuario</label><br>
+        <input id="regUser" required><br><br>
+        <label>Correo electrónico</label><br>
+        <input id="regEmail" type="email" required><br><br>
+        <label>Contraseña</label><br>
+        <input id="regPass" type="password" required><br><br>
+        <button class="btn" type="submit">Registrar</button>
+      </form>
+
+      <p id="message" style="margin-top:12px;color:#b00"></p>
+    </section>
+  </main>
+
+  <script>
+    const API_URL = 'http://localhost:8080/api/auth'; // ajusta el puerto si es otro
+
+    const message = document.getElementById('message');
+
+    // === REGISTRO ===
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('regUser').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPass').value;
+
+      try {
+        const res = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          message.style.color = 'green';
+          message.textContent = 'Registro exitoso. Ahora inicia sesión.';
+          document.getElementById('regForm').reset();
+        } else {
+          message.style.color = 'red';
+          message.textContent = data.message || 'Error en el registro.';
+        }
+      } catch (err) {
+        message.textContent = 'Error de conexión con el servidor.';
+      }
+    });
+
+    // === LOGIN ===
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPass').value;
+
+      try {
+        const res = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.token) {
+          localStorage.setItem('token', data.token);
+          message.style.color = 'green';
+          message.textContent = 'Inicio de sesión exitoso ✅';
+          setTimeout(() => window.location.href = 'index.html', 1500);
+        } else {
+          message.style.color = 'red';
+          message.textContent = data.message || 'Error al iniciar sesión.';
+        }
+      } catch (err) {
+        message.textContent = 'Error de conexión con el servidor.';
+      }
+    });
+  </script>
+</body>
+</html>
