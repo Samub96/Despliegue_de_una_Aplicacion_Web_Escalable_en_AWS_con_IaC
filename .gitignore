@@ -1,0 +1,2 @@
+# Ignorar cualquier carpeta llamada secrets
+**/secrets/

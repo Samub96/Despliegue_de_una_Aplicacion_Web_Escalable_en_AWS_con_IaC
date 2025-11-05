@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "EC2 base para ejecutar la aplicación (bastión + app) sin roles IAM (sandbox compatible)"
+
+Parameters:
+  VpcId:
+    Type: String
+  PublicSubnetIds:
+    Type: CommaDelimitedList
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: "Key pair para acceder por SSH"
+  InstanceType:
+    Type: String
+    Default: t3.micro
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP and SSH
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: app-sg
+
+  AppInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref AmiId
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Select [0, !Ref PublicSubnetIds]
+          GroupSet:
+            - !Ref AppSecurityGroup
+
+      # 🚀 Sin IamInstanceProfile (bloqueado en sandbox)
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # === Configuración inicial ===
+          yum update -y
+          yum install -y git nodejs npm
+
+          # === Clonar el repositorio ===
+          cd /home/ec2-user
+          https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git
+          cd proyecto/src/backend
+
+          # === Instalar dependencias ===
+          npm install -g pm2
+          npm install
+
+          # === Iniciar backend con PM2 ===
+          pm2 start server.js --name "backend"
+          pm2 startup systemd
+          pm2 save
+
+          # === Log ===
+          echo "Backend iniciado correctamente" > /home/ec2-user/startup.log
+
+      Tags:
+        - Key: Name
+          Value: app-instance
+
+Outputs:
+  AppInstanceId:
+    Value: !Ref AppInstance
+    Export:
+      Name: project-app-instance-id
+  AppSecurityGroupId:
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: project-app-sg-id

@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudWatch Alarms para CPU y Logs básicos"
+
+Parameters:
+  AutoScalingGroupName:
+    Type: String
+  AlarmEmail:
+    Type: String
+
+Resources:
+  HighCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: project-high-cpu
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 70
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - Ref: AlarmTopic
+
+  LowCpuAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: project-low-cpu
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 10
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - Ref: AlarmTopic
+
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: project-alarms-topic
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlarmEmail
+
+Outputs:
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic
+    Export:
+      Name: project-alarm-topic
