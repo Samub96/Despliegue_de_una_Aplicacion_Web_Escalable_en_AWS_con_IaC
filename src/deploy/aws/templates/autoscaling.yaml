@@ -20,13 +20,13 @@ Parameters:
     Type: CommaDelimitedList
   DesiredCapacity:
     Type: Number
-    Default: 1
+    Default: 2
   MinSize:
     Type: Number
-    Default: 1
+    Default: 2
   MaxSize:
     Type: Number
-    Default: 3
+    Default: 2
   TargetGroupArn:
     Type: String
 
