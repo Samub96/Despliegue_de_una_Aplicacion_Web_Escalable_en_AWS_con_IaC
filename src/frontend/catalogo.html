@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8">
+    <title>Catálogo</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body class="auth-bg">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="top-nav">
+        <h1 class="logo">Catálogo 📦</h1>
+
+        <nav class="top-links">
+            <a class="btn-nav" href="cart.html">Carrito</a>
+            <a class="btn-nav" href="login.html" onclick="logout()">Salir</a>
+        </nav>
+    </header>
+
+    <main class="catalog-main">
+
+        <h2 class="catalog-title">Gestiona tus productos</h2>
+        <p class="subtitle">Usa las flechas para ver más productos</p>
+
+        <div class="slider-container">
+
+            <button class="slide-btn" id="left-btn">‹</button>
+
+            <div class="product-track-wrapper">
+                <div class="product-track" id="products"></div>
+            </div>
+
+            <button class="slide-btn" id="right-btn">›</button>
+
+            <div class="add-product-container">
+                <button class="add-product-btn">Agregar producto</button>
+            </div>
+
+
+        </div>
+
+        <p id="message" class="message"></p>
+    </main>
+
+    <script>
+        const API_URL = 'http://localhost:8080/api/products';
+        const CART_URL = 'http://localhost:8080/api/cart';
+        const token = localStorage.getItem('token');
+        const productsTrack = document.getElementById('products');
+        const message = document.getElementById('message');
+
+        function logout() {
+            localStorage.removeItem('token');
+        }
+
+        async function loadProducts() {
+            try {
+                const res = await fetch(API_URL);
+                const data = await res.json();
+
+                productsTrack.innerHTML = data.map(p => `
+          <div class="product-card">
+            <img src="${p.image}" alt="${p.name}">
+            <h3>${p.name}</h3>
+            <p class="desc">${p.description}</p>
+            <p class="price">$${p.price.toFixed(2)}</p>
+            <button class="btn-primary" onclick="addToCart(${p.id})">Agregar</button>
+          </div>
+        `).join('');
+
+                checkArrows();
+            } catch (err) {
+                message.textContent = '❌ Error al cargar productos.';
+            }
+        }
+
+        async function addToCart(productId) {
+            if (!token) {
+                alert('Debes iniciar sesión.');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            await fetch(`${CART_URL}/${productId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + token
+                }
+            });
+
+            alert('✅ Producto agregado al carrito.');
+        }
+
+        document.getElementById("left-btn").onclick = () => {
+            productsTrack.scrollBy({ left: -300, behavior: "smooth" });
+            checkArrows();
+        };
+
+        document.getElementById("right-btn").onclick = () => {
+            productsTrack.scrollBy({ left: 300, behavior: "smooth" });
+            checkArrows();
+        };
+
+        function checkArrows() {
+            const leftBtn = document.getElementById("left-btn");
+            const rightBtn = document.getElementById("right-btn");
+
+            leftBtn.style.opacity = productsTrack.scrollLeft > 0 ? "1" : "0.4";
+            rightBtn.style.opacity = (productsTrack.scrollLeft + productsTrack.clientWidth) < productsTrack.scrollWidth ? "1" : "0.4";
+        }
+
+        loadProducts();
+    </script>
+
+</body>
+
+</html>
