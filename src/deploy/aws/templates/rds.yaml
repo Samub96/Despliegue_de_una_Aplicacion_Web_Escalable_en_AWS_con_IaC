@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "RDS PostgreSQL para la aplicación"
+Description: "RDS MySQL para la aplicación (alineado con backend)"
 
 Parameters:
   VpcId:
@@ -24,16 +24,16 @@ Resources:
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "SG RDS PostgreSQL"
+      GroupDescription: "SG RDS MySQL"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
+          FromPort: 3306
+          ToPort: 3306
           CidrIp: 10.0.0.0/16
       Tags:
         - Key: Name
-          Value: rds-sg
+          Value: rds-mysql-sg
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -47,7 +47,8 @@ Resources:
   DBInstance:
     Type: AWS::RDS::DBInstance
     Properties:
-      Engine: postgres
+      Engine: mysql
+      EngineVersion: "8.0"
       DBName: !Ref DBName
       MasterUsername: !Ref DBUser
       MasterUserPassword: !Ref DBPassword

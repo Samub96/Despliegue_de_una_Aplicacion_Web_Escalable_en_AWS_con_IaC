@@ -53,14 +53,19 @@ Resources:
           exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
           yum update -y
-          amazon-linux-extras enable nginx1 2>/dev/null || true
-          yum install -y nginx git gcc-c++ make curl
-
-          # Node.js 18
-          curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
-          yum install -y nodejs
-
-          npm install -g pm2 --no-fund --no-audit
+          
+          # Instalar Docker
+          amazon-linux-extras install docker -y
+          systemctl enable docker
+          systemctl start docker
+          usermod -a -G docker ec2-user
+          
+          # Instalar Docker Compose
+          curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+          
+          yum install -y git curl
 
           HOME_DIR=/home/ec2-user
           REPO_DIR=$HOME_DIR/app
@@ -68,19 +73,17 @@ Resources:
           # Clonar repo
           if [ ! -d "$REPO_DIR" ]; then
             cd $HOME_DIR
-            sudo -u ec2-user git clone https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git app
+            sudo -u ec2-user git clone https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC/tree/aws app
             chown -R ec2-user:ec2-user $REPO_DIR
           else
             cd $REPO_DIR
             sudo -u ec2-user git pull || true
           fi
 
-          # Backend
-          if [ -d "$REPO_DIR/src/backend" ]; then
-            cd $REPO_DIR/src/backend
-            cat > .env <<ENV_FILE
+          # Crear configuración para producción
+          cd $REPO_DIR
+          cat > .env <<ENV_FILE
           DB_HOST=${DBEndpoint}
-          DB_PORT=5432
           DB_NAME=${DBName}
           DB_USER=${DBUser}
           DB_PASSWORD=${DBPassword}
@@ -88,16 +91,87 @@ Resources:
           NODE_ENV=production
           PORT=8080
           ENV_FILE
-            chown ec2-user:ec2-user .env
-            chmod 600 .env
+          chown ec2-user:ec2-user .env
 
-            sudo -u ec2-user npm install --production
-            sudo -u ec2-user npm run seed || true
+          # Crear docker-compose para auto scaling
+          cat > docker-compose.asg.yml <<DOCKER_COMPOSE
+          version: '3.8'
+          services:
+            backend:
+              build:
+                context: ./src/backend
+                dockerfile: Dockerfile
+              container_name: ecommerce_backend_asg
+              restart: always
+              environment:
+                - DB_HOST=${DBEndpoint}
+                - DB_NAME=${DBName}
+                - DB_USER=${DBUser}
+                - DB_PASSWORD=${DBPassword}
+                - DB_DIALECT=mysql
+                - JWT_SECRET=$(openssl rand -base64 32)
+                - PORT=8080
+                - NODE_ENV=production
+              ports:
+                - "8080:8080"
+              healthcheck:
+                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+                timeout: 10s
+                retries: 5
+                interval: 30s
+              networks:
+                - app-network
+          
+            frontend:
+              build:
+                context: ./src/frontend
+                dockerfile: Dockerfile
+              container_name: ecommerce_frontend_asg
+              restart: always
+              ports:
+                - "80:80"
+              depends_on:
+                backend:
+                  condition: service_healthy
+              healthcheck:
+                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+                timeout: 10s
+                retries: 3
+                interval: 30s
+              networks:
+                - app-network
+          
+          networks:
+            app-network:
+              driver: bridge
+          DOCKER_COMPOSE
+          chown ec2-user:ec2-user docker-compose.asg.yml
 
-            sudo -u ec2-user pm2 start server.js --name backend --update-env
-            sudo -u ec2-user pm2 startup systemd -u ec2-user --hp /home/ec2-user
-            sudo -u ec2-user pm2 save
-          fi
+          # Iniciar aplicación
+          cd $REPO_DIR
+          sudo -u ec2-user docker-compose -f docker-compose.asg.yml up --build -d
+
+          # Auto-start service
+          cat > /etc/systemd/system/ecommerce-asg.service <<SERVICE_FILE
+          [Unit]
+          Description=E-commerce ASG Application
+          Requires=docker.service
+          After=docker.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          WorkingDirectory=$REPO_DIR
+          ExecStart=/usr/local/bin/docker-compose -f docker-compose.asg.yml up -d
+          ExecStop=/usr/local/bin/docker-compose -f docker-compose.asg.yml down
+          TimeoutStartSec=0
+          User=ec2-user
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE_FILE
+
+          systemctl enable ecommerce-asg.service
 
           # Frontend
           if [ -d "$REPO_DIR/src/frontend" ]; then

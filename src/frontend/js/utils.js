@@ -1,5 +1,8 @@
 // Configuración básica del frontend para comunicar con backend
-const API_BASE = 'http://localhost:8080/api';
+// Usar configuración dinámica si está disponible, sino fallback
+const API_BASE = window.APP_CONFIG ? 
+  window.APP_CONFIG.getApiBaseUrl() : 
+  'http://localhost:8080/api';
 
 function getToken() {
   return localStorage.getItem('token');
