@@ -6,8 +6,6 @@ Parameters:
     Type: String
   PublicSubnetIds:
     Type: CommaDelimitedList
-  AppSecurityGroupId:
-    Type: String
 
 Resources:
   ALBSecurityGroup:
@@ -33,6 +31,9 @@ Resources:
         - !Ref ALBSecurityGroup
       Scheme: internet-facing
       Type: application
+      Tags:
+        - Key: Name
+          Value: project-alb
 
   AppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -42,9 +43,19 @@ Resources:
       Protocol: HTTP
       VpcId: !Ref VpcId
       TargetType: instance
+      HealthCheckEnabled: true
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPort: traffic-port
+      HealthCheckPath: /health
       HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200-399
+      Tags:
+        - Key: Name
+          Value: project-tg
 
   HttpListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
@@ -57,11 +68,26 @@ Resources:
           TargetGroupArn: !Ref AppTargetGroup
 
 Outputs:
-  LoadBalancerDNS:
+  ALBDNS:
+    Description: "DNS del Application Load Balancer"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
     Export:
       Name: project-alb-dns
+  
+  ALBArn:
+    Description: "ARN del ALB"
+    Value: !Ref ApplicationLoadBalancer
+    Export:
+      Name: project-alb-arn
+
   TargetGroupArn:
+    Description: "ARN del Target Group"
     Value: !Ref AppTargetGroup
     Export:
-      Name: project-targetgroup-arn
+      Name: project-tg-arn
+
+  ALBSecurityGroupId:
+    Description: "Security Group del ALB"
+    Value: !Ref ALBSecurityGroup
+    Export:
+      Name: project-alb-sg-id

@@ -1,72 +1,78 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "RDS MySQL (single-AZ) para la aplicación"
+Description: "RDS PostgreSQL para la aplicación"
 
 Parameters:
-  DBUsername:
+  VpcId:
     Type: String
-    Default: admin
+  PrivateSubnetIds:
+    Type: CommaDelimitedList
+  DBName:
+    Type: String
+  DBUser:
+    Type: String
   DBPassword:
     Type: String
     NoEcho: true
-  DBName:
-    Type: String
-    Default: appdb
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
   DBInstanceClass:
     Type: String
     Default: db.t3.micro
-  AllocatedStorage:
-    Type: Number
-    Default: 20
-  VpcId:
-    Type: String
-  DBSubnetIds:
-    Type: CommaDelimitedList
 
 Resources:
-  DBSubnetGroup:
-    Type: AWS::RDS::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Subnet group for project RDS
-      SubnetIds: !Ref DBSubnetIds
-      DBSubnetGroupName: project-db-subnet-group
-
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow DB access from app SG
+      GroupDescription: "SG RDS PostgreSQL"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
+          FromPort: 5432
+          ToPort: 5432
           CidrIp: 10.0.0.0/16
       Tags:
         - Key: Name
-          Value: project-db-sg
+          Value: rds-sg
 
-  RDSInstance:
-    Type: AWS::RDS::DBInstance
-    DeletionPolicy: Snapshot   
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
     Properties:
-      DBInstanceIdentifier: project-rds
-      Engine: mysql
-      MasterUsername: !Ref DBUsername
-      MasterUserPassword: !Ref DBPassword
+      DBSubnetGroupDescription: "Subnets privadas para RDS"
+      SubnetIds: !Ref PrivateSubnetIds
+      Tags:
+        - Key: Name
+          Value: rds-subnet-group
+
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      Engine: postgres
       DBName: !Ref DBName
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: !Ref DBAllocatedStorage
       DBInstanceClass: !Ref DBInstanceClass
-      AllocatedStorage: !Ref AllocatedStorage
-      EngineVersion: "8.0"
-      PubliclyAccessible: false
       VPCSecurityGroups:
         - !Ref DBSecurityGroup
       DBSubnetGroupName: !Ref DBSubnetGroup
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 1
+      StorageType: gp2
+      DeletionProtection: false
+      MultiAZ: false
+    DeletionPolicy: Delete
 
 Outputs:
-  RdsEndpoint:
-    Value: !GetAtt RDSInstance.Endpoint.Address
+  DBEndpoint:
+    Value: !GetAtt DBInstance.Endpoint.Address
     Export:
-      Name: project-rds-endpoint
-  RdsPort:
-    Value: !GetAtt RDSInstance.Endpoint.Port
+      Name: project-db-endpoint
+  DBPort:
+    Value: !GetAtt DBInstance.Endpoint.Port
     Export:
-      Name: project-rds-port
+      Name: project-db-port
+  DBSecurityGroupId:
+    Value: !Ref DBSecurityGroup
+    Export:
+      Name: project-db-sg-id

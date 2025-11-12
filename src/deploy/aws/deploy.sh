@@ -10,7 +10,10 @@ STACK_NAME="ProyectoFinalStack"
 BUCKET="proyecto-final-samuel"
 REGION="us-east-1"
 KEY_PAIR="vockey"                      # ⚠️ Nombre del Key Pair registrado en AWS (sin .pem)
-ADMIN_EMAIL="samuel.barona@u.icesi.edu.co"      # ⚠️ Cambia por tu correo
+ADMIN_EMAIL="samuel.barona@u.icesi.edu.co"  # ⚠️ Cambia por tu correo
+ALERT_EMAIL="samuel.barona@u.icesi.edu.co"
+DB_NAME="appdb"  # ⚠️ Cambia por tu nombre de base de datos
+DB_USER="appuser"  # ⚠️ Cambia por tu nombre de usuario de base de datos
 DB_PASSWORD="ProjFinal#2025"                   # ⚠️ Usa una contraseña segura
 TEMPLATES_PATH="templates"
 CRED_FILE="secrets/aws_credentials.txt"
@@ -117,9 +120,19 @@ aws cloudformation create-stack \
   --stack-name ${STACK_NAME} \
   --template-url ${MAIN_URL} \
   --parameters \
+      ParameterKey=S3TemplateBucket,ParameterValue=${BUCKET} \
       ParameterKey=KeyName,ParameterValue=${KEY_PAIR} \
-      ParameterKey=AdminEmail,ParameterValue=${ADMIN_EMAIL} \
+      ParameterKey=AlertEmail,ParameterValue=${ALERT_EMAIL} \
+      ParameterKey=DBName,ParameterValue=${DB_NAME} \
+      ParameterKey=DBUser,ParameterValue=${DB_USER} \
       ParameterKey=DBPassword,ParameterValue=${DB_PASSWORD} \
+      ParameterKey=VpcCidr,ParameterValue=10.0.0.0/16 \
+      ParameterKey=PublicSubnet1Cidr,ParameterValue=10.0.1.0/24 \
+      ParameterKey=PublicSubnet2Cidr,ParameterValue=10.0.2.0/24 \
+      ParameterKey=PrivateSubnet1Cidr,ParameterValue=10.0.11.0/24 \
+      ParameterKey=PrivateSubnet2Cidr,ParameterValue=10.0.12.0/24 \
+      ParameterKey=AvailabilityZone1,ParameterValue=us-east-1a \
+      ParameterKey=AvailabilityZone2,ParameterValue=us-east-1b \
   --capabilities CAPABILITY_NAMED_IAM \
   --region ${REGION}
 
