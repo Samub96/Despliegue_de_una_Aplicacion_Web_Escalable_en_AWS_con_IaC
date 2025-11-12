@@ -58,7 +58,7 @@ Resources:
           GroupSet:
             - !Ref AppSecurityGroup
 
-      # 🚀 Sin IamInstanceProfile (bloqueado en sandbox)
+  # Sin IamInstanceProfile (bloqueado en sandbox)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -84,10 +84,10 @@ Resources:
           HOME_DIR=/home/ec2-user
           REPO_DIR=$HOME_DIR/app
 
-          # Clonar repositorio
+          # Clonar repositorio (rama aws)
           if [ ! -d "$REPO_DIR" ]; then
             cd $HOME_DIR
-            sudo -u ec2-user git clone https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC/tree/aws app
+            sudo -u ec2-user git clone --branch aws --single-branch https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git app
             chown -R ec2-user:ec2-user $REPO_DIR
           else
             cd $REPO_DIR
