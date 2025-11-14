@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # Para producción: remover el servicio MySQL local
+  # El backend se conectará directamente a RDS
+  
+  # Backend - usar variables de entorno para conectar a RDS
+  backend:
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=${DB_HOST}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - DB_DIALECT=mysql
+      - PORT=8080
+    # Remover dependencia de MySQL local
+    depends_on: []
+
+  # Frontend mantiene la misma configuración
+  frontend:
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# Remover el servicio mysql para producción
+# No incluimos el servicio mysql aquí, así Docker Compose lo ignora
+
+# Remover el volumen de MySQL local
+volumes: {}

@@ -58,6 +58,15 @@ Resources:
           GroupSet:
             - !Ref AppSecurityGroup
 
+  # Registrar la instancia al Target Group del ALB
+  TargetGroupAttachment:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroupAttachment
+    Properties:
+      TargetGroupArn: 
+        Fn::ImportValue: project-tg-arn
+      TargetId: !Ref AppInstance
+      Port: 80
+
   # Sin IamInstanceProfile (bloqueado en sandbox)
       UserData:
         Fn::Base64: !Sub |
@@ -94,10 +103,10 @@ Resources:
             sudo -u ec2-user git pull || true
           fi
 
-          # Crear configuración para producción
+          # Configurar variables de entorno para producción
           cd $REPO_DIR
           
-          # Actualizar .env del backend para producción
+          # Actualizar .env del backend para RDS
           cat > src/backend/.env <<ENV_FILE
           DB_NAME=${DBName}
           DB_USER=${DBUser}
@@ -109,60 +118,20 @@ Resources:
           ENV_FILE
           chown ec2-user:ec2-user src/backend/.env
 
-          # Crear docker-compose para producción (sin MySQL, usa RDS)
-          cat > docker-compose.prod.yml <<DOCKER_COMPOSE
-          version: '3.8'
+          # Crear .env para docker-compose con variables de RDS
+          cat > .env <<COMPOSE_ENV
+          DB_HOST=${DBEndpoint}
+          DB_NAME=${DBName}
+          DB_USER=${DBUser}
+          DB_PASSWORD=${DBPassword}
+          JWT_SECRET=$(openssl rand -base64 32)
+          COMPOSE_ENV
+          chown ec2-user:ec2-user .env
 
-          services:
-            # Backend API
-            backend:
-              build:
-                context: ./src/backend
-                dockerfile: Dockerfile
-              container_name: ecommerce_backend
-              restart: unless-stopped
-              ports:
-                - "8080:8080"
-              environment:
-                - NODE_ENV=production
-              networks:
-                - ecommerce_network
-              healthcheck:
-                test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
-                timeout: 10s
-                retries: 5
-                start_period: 30s
-
-            # Frontend Web Server
-            frontend:
-              build:
-                context: ./src/frontend
-                dockerfile: Dockerfile
-              container_name: ecommerce_frontend
-              restart: unless-stopped
-              ports:
-                - "80:80"
-              networks:
-                - ecommerce_network
-              depends_on:
-                backend:
-                  condition: service_healthy
-              healthcheck:
-                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
-                timeout: 3s
-                retries: 3
-                start_period: 5s
-
-          # Networks
-          networks:
-            ecommerce_network:
-              driver: bridge
-          DOCKER_COMPOSE
-          chown ec2-user:ec2-user docker-compose.prod.yml
-
-          # Construir e iniciar aplicación
+          # Usar el docker-compose.yml existente que ya funciona
+          # Con docker-compose.override.yml para configuración de producción (RDS)
           cd $REPO_DIR
-          sudo -u ec2-user docker-compose -f docker-compose.prod.yml up --build -d
+          sudo -u ec2-user docker-compose up --build -d
 
           # Esperar a que el backend esté listo y luego inicializar RDS
           echo "⏳ Esperando a que el backend esté listo..."
@@ -183,8 +152,8 @@ Resources:
           Type=oneshot
           RemainAfterExit=yes
           WorkingDirectory=$REPO_DIR
-          ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d
-          ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
+          ExecStart=/usr/local/bin/docker-compose up -d
+          ExecStop=/usr/local/bin/docker-compose down
           TimeoutStartSec=0
           User=ec2-user
 
