@@ -8,23 +8,13 @@ Parameters:
     Type: CommaDelimitedList
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
+    Description: "Key pair para acceder por SSH"
   InstanceType:
     Type: String
     Default: t3.micro
   AmiId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
-  DBEndpoint:
-    Type: String
-  DBName:
-    Type: String
-    Default: appdb
-  DBUser:
-    Type: String
-    Default: admin
-  DBPassword:
-    Type: String
-    NoEcho: true
 
 Resources:
   AppSecurityGroup:
@@ -58,110 +48,30 @@ Resources:
           GroupSet:
             - !Ref AppSecurityGroup
 
-  # Registrar la instancia al Target Group del ALB
-  TargetGroupAttachment:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroupAttachment
-    Properties:
-      TargetGroupArn: 
-        Fn::ImportValue: project-tg-arn
-      TargetId: !Ref AppInstance
-      Port: 80
-
-  # Sin IamInstanceProfile (bloqueado en sandbox)
+      # 🚀 Sin IamInstanceProfile (bloqueado en sandbox)
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          set -ex
-          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-
+          # === Configuración inicial ===
           yum update -y
-          
-          # Instalar Docker
-          amazon-linux-extras install docker -y
-          systemctl enable docker
-          systemctl start docker
-          usermod -a -G docker ec2-user
-          
-          # Instalar Docker Compose
-          curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
-          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-          
-          # Instalar git y otras herramientas
-          yum install -y git curl
-          
-          HOME_DIR=/home/ec2-user
-          REPO_DIR=$HOME_DIR/app
+          yum install -y git nodejs npm
 
-          # Clonar repositorio (rama aws)
-          if [ ! -d "$REPO_DIR" ]; then
-            cd $HOME_DIR
-            sudo -u ec2-user git clone --branch aws --single-branch https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git app
-            chown -R ec2-user:ec2-user $REPO_DIR
-          else
-            cd $REPO_DIR
-            sudo -u ec2-user git pull || true
-          fi
+          # === Clonar el repositorio ===
+          cd /home/ec2-user
+          https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git
+          cd proyecto/src/backend
 
-          # Configurar variables de entorno para producción
-          cd $REPO_DIR
-          
-          # Actualizar .env del backend para RDS
-          cat > src/backend/.env <<ENV_FILE
-          DB_NAME=${DBName}
-          DB_USER=${DBUser}
-          DB_PASSWORD=${DBPassword}
-          DB_HOST=${DBEndpoint}
-          JWT_SECRET=$(openssl rand -base64 32)
-          DB_DIALECT=mysql
-          PORT=8080
-          ENV_FILE
-          chown ec2-user:ec2-user src/backend/.env
+          # === Instalar dependencias ===
+          npm install -g pm2
+          npm install
 
-          # Crear .env para docker-compose con variables de RDS
-          cat > .env <<COMPOSE_ENV
-          DB_HOST=${DBEndpoint}
-          DB_NAME=${DBName}
-          DB_USER=${DBUser}
-          DB_PASSWORD=${DBPassword}
-          JWT_SECRET=$(openssl rand -base64 32)
-          COMPOSE_ENV
-          chown ec2-user:ec2-user .env
+          # === Iniciar backend con PM2 ===
+          pm2 start server.js --name "backend"
+          pm2 startup systemd
+          pm2 save
 
-          # Usar el docker-compose.yml existente que ya funciona
-          # Con docker-compose.override.yml para configuración de producción (RDS)
-          cd $REPO_DIR
-          sudo -u ec2-user docker-compose up --build -d
-
-          # Esperar a que el backend esté listo y luego inicializar RDS
-          echo "⏳ Esperando a que el backend esté listo..."
-          sleep 30
-          
-          # Inicializar RDS con datos
-          chmod +x src/deploy/aws/init-rds.sh
-          ./src/deploy/aws/init-rds.sh "${DBEndpoint}" "${DBUser}" "${DBPassword}" "${DBName}"
-
-          # Configurar auto-start en boot
-          cat > /etc/systemd/system/ecommerce-app.service <<SERVICE_FILE
-          [Unit]
-          Description=E-commerce Application
-          Requires=docker.service
-          After=docker.service
-
-          [Service]
-          Type=oneshot
-          RemainAfterExit=yes
-          WorkingDirectory=$REPO_DIR
-          ExecStart=/usr/local/bin/docker-compose up -d
-          ExecStop=/usr/local/bin/docker-compose down
-          TimeoutStartSec=0
-          User=ec2-user
-
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE_FILE
-
-          systemctl enable ecommerce-app.service
+          # === Log ===
+          echo "Backend iniciado correctamente" > /home/ec2-user/startup.log
 
       Tags:
         - Key: Name

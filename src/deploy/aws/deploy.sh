@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================
-# Script de despliegue AWS - Proyecto Final 2025 (DOCKERIZADO)
+# Script de despliegue AWS - Proyecto Final 2025
 # Autor: Samuel
 # Requiere: AWS CLI y archivo aws_credentials.txt con credenciales del sandbox
 # =============================================
@@ -10,24 +10,16 @@ STACK_NAME="ProyectoFinalStack"
 BUCKET="proyecto-final-samuel"
 REGION="us-east-1"
 KEY_PAIR="vockey"                      # ⚠️ Nombre del Key Pair registrado en AWS (sin .pem)
-ADMIN_EMAIL="samuel.barona@u.icesi.edu.co"  # ⚠️ Cambia por tu correo
-ALERT_EMAIL="samuel.barona@u.icesi.edu.co"
-DB_NAME="ecommerce_db"  # Actualizado para coincidir con nuestra app
-DB_USER="appuser"
-DB_PASSWORD="ProjFinal#2025"
+ADMIN_EMAIL="samuel.barona@u.icesi.edu.co"      # ⚠️ Cambia por tu correo
+DB_PASSWORD="ProjFinal#2025"                   # ⚠️ Usa una contraseña segura
 TEMPLATES_PATH="templates"
 CRED_FILE="secrets/aws_credentials.txt"
 PEM_FILE="secrets/test.pem"
 
-echo "🐳 DESPLEGANDO APLICACIÓN DOCKERIZADA"
-echo "======================================"
-echo "📦 Stack: $STACK_NAME"
-echo "🗃️ Bucket: $BUCKET" 
-echo "🌐 Región: $REGION"
-echo "🔑 Key Pair: $KEY_PAIR"
-echo "📧 Email: $ADMIN_EMAIL"
-echo "🗄️ Base de datos: $DB_NAME"
-echo "======================================"
+##======= DEBUG: LISTAR ARCHIVOS ========
+## "---------------------------------------"
+##cat secrets/aws_credentials.txt
+ ##"---------------------------------------"
 # ======== LEER CREDENCIALES DESDE TXT ========
 echo "🔐 Leyendo credenciales desde ${CRED_FILE}..."
 
@@ -125,19 +117,9 @@ aws cloudformation create-stack \
   --stack-name ${STACK_NAME} \
   --template-url ${MAIN_URL} \
   --parameters \
-      ParameterKey=S3TemplateBucket,ParameterValue=${BUCKET} \
       ParameterKey=KeyName,ParameterValue=${KEY_PAIR} \
-      ParameterKey=AlertEmail,ParameterValue=${ALERT_EMAIL} \
-      ParameterKey=DBName,ParameterValue=${DB_NAME} \
-      ParameterKey=DBUser,ParameterValue=${DB_USER} \
+      ParameterKey=AdminEmail,ParameterValue=${ADMIN_EMAIL} \
       ParameterKey=DBPassword,ParameterValue=${DB_PASSWORD} \
-      ParameterKey=VpcCidr,ParameterValue=10.0.0.0/16 \
-      ParameterKey=PublicSubnet1Cidr,ParameterValue=10.0.1.0/24 \
-      ParameterKey=PublicSubnet2Cidr,ParameterValue=10.0.2.0/24 \
-      ParameterKey=PrivateSubnet1Cidr,ParameterValue=10.0.11.0/24 \
-      ParameterKey=PrivateSubnet2Cidr,ParameterValue=10.0.12.0/24 \
-      ParameterKey=AvailabilityZone1,ParameterValue=us-east-1a \
-      ParameterKey=AvailabilityZone2,ParameterValue=us-east-1b \
   --capabilities CAPABILITY_NAMED_IAM \
   --region ${REGION}
 
@@ -173,40 +155,8 @@ ALB_DNS=$(aws cloudformation describe-stacks \
 
 if [ "$ALB_DNS" != "None" ]; then
     echo "🌐 Tu aplicación está disponible en: http://${ALB_DNS}"
-    echo "🔍 Probando conectividad..."
-    
-    # Esperar un momento para que la aplicación se estabilice
-    echo "⏳ Esperando que la aplicación se inicie..."
-    sleep 60
-    
-    # Probar health check
-    if curl -s --max-time 30 "http://${ALB_DNS}/health" > /dev/null; then
-        echo "✅ Health check OK - La aplicación está funcionando!"
-    else
-        echo "⚠️ Health check falló - La aplicación puede estar aún iniciándose"
-    fi
-    
-    # Probar API
-    if curl -s --max-time 30 "http://${ALB_DNS}/api/health" > /dev/null; then
-        echo "✅ API health check OK!"
-    else
-        echo "⚠️ API health check falló"
-    fi
-    
-    echo ""
-    echo "📱 URLs importantes:"
-    echo "   🏠 Frontend: http://${ALB_DNS}"
-    echo "   🔌 API: http://${ALB_DNS}/api"
-    echo "   ❤️ Health: http://${ALB_DNS}/health"
-    echo "   📦 Productos: http://${ALB_DNS}/api/products"
-    
 else
     echo "⚠️ No se encontró ALB_DNS en los outputs. Revisa el template."
 fi
 
-echo ""
-echo "🐳 DESPLIEGUE DOCKERIZADO COMPLETO"
-echo "=================================="
-echo "📊 Monitorea tu aplicación en CloudWatch"
-echo "📧 Recibirás notificaciones en: $ALERT_EMAIL"
-echo "🔧 Para actualizar la aplicación, haz git push y redespliega"
+echo "🎉 Despliegue completo."

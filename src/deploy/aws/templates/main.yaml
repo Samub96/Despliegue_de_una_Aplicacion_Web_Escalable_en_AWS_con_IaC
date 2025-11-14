@@ -2,107 +2,73 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Stack maestro que referencia stacks hijos (usar TemplateURL con S3 o desplegar por separado)."
 
 Parameters:
-  S3TemplateBucket:
-    Type: String
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  AlertEmail:
+  AdminEmail:
     Type: String
-  DBName:
-    Type: String
-    Default: appdb
-  DBUser:
-    Type: String
-    Default: admin
   DBPassword:
     Type: String
     NoEcho: true
-  VpcCidr:
-    Type: String
-    Default: 10.0.0.0/16
-  PublicSubnet1Cidr:
-    Type: String
-    Default: 10.0.1.0/24
-  PublicSubnet2Cidr:
-    Type: String
-    Default: 10.0.2.0/24
-  PrivateSubnet1Cidr:
-    Type: String
-    Default: 10.0.11.0/24
-  PrivateSubnet2Cidr:
-    Type: String
-    Default: 10.0.12.0/24
-  AvailabilityZone1:
-    Type: String
-    Default: us-east-1a
-  AvailabilityZone2:
-    Type: String
-    Default: us-east-1b
 
 Resources:
   VPCStack:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/vpc.yaml"
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/vpc.yaml
       Parameters:
-        VpcCidr: !Ref VpcCidr
-        PublicSubnet1Cidr: !Ref PublicSubnet1Cidr
-        PublicSubnet2Cidr: !Ref PublicSubnet2Cidr
-        PrivateSubnet1Cidr: !Ref PrivateSubnet1Cidr
-        PrivateSubnet2Cidr: !Ref PrivateSubnet2Cidr
-        AvailabilityZone1: !Ref AvailabilityZone1
-        AvailabilityZone2: !Ref AvailabilityZone2
+        VpcCidr: 10.0.0.0/16
 
   RDSStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: VPCStack
     Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/rds.yaml"
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/rds.yaml
       Parameters:
-        VpcId: !GetAtt VPCStack.Outputs.VpcId
-        PrivateSubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
-        DBName: !Ref DBName
-        DBUser: !Ref DBUser
+        DBUsername: admin
         DBPassword: !Ref DBPassword
+        DBName: appdb
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        DBSubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
 
-  ALBStack:
+  EC2Stack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: VPCStack
     Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/alb.yaml"
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/ec2.yaml
       Parameters:
         VpcId: !GetAtt VPCStack.Outputs.VpcId
         PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
+        KeyName: !Ref KeyName
+
+  ALBStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/alb.yaml
+      Parameters:
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
+        PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
+        AppSecurityGroupId: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
 
   AutoScalingStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - VPCStack
-      - RDSStack
-      - ALBStack
     Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/autoscaling.yaml"
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/autoscaling.yaml
       Parameters:
-        VpcId: !GetAtt VPCStack.Outputs.VpcId
-        SubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
+        ImageId: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+        InstanceType: t3.micro
         KeyName: !Ref KeyName
+        SecurityGroupIds: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
+        SubnetIds: !GetAtt VPCStack.Outputs.PrivateSubnetIds
         TargetGroupArn: !GetAtt ALBStack.Outputs.TargetGroupArn
-        DBEndpoint: !GetAtt RDSStack.Outputs.DBEndpoint
-        DBName: !Ref DBName
-        DBUser: !Ref DBUser
-        DBPassword: !Ref DBPassword
 
   CloudWatchStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn: AutoScalingStack
     Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/cloudwatch.yaml"
+      TemplateURL: https://s3.amazonaws.com/proyecto-final-samuel/cloudwatch.yaml
       Parameters:
         AutoScalingGroupName: !GetAtt AutoScalingStack.Outputs.AutoScalingGroupName
-        AlarmEmail: !Ref AlertEmail
+        AlarmEmail: !Ref AdminEmail
 
 Outputs:
   ALBDNS:
-    Value: !GetAtt ALBStack.Outputs.ALBDNS
-  DBEndpoint:
-    Value: !GetAtt RDSStack.Outputs.DBEndpoint
+    Value: !GetAtt ALBStack.Outputs.LoadBalancerDNS
+  RDSEndpoint:
+    Value: !GetAtt RDSStack.Outputs.RdsEndpoint

@@ -2,6 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: "Auto Scaling Group + Launch Configuration para la aplicación"
 
 Parameters:
+  LaunchTemplateId:
+    Type: String
+    Description: "Si usas LaunchTemplate (opcional). Deja vacío si usarás LaunchConfiguration."
+    Default: ""
   ImageId:
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
@@ -10,161 +14,39 @@ Parameters:
     Default: t3.micro
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  VpcId:
-    Type: String
+  SecurityGroupIds:
+    Type: CommaDelimitedList
   SubnetIds:
     Type: CommaDelimitedList
   DesiredCapacity:
     Type: Number
-    Default: 2
+    Default: 1
   MinSize:
     Type: Number
-    Default: 2
+    Default: 1
   MaxSize:
     Type: Number
-    Default: 4
+    Default: 3
   TargetGroupArn:
     Type: String
-  DBEndpoint:
-    Type: String
-  DBName:
-    Type: String
-    Default: appdb
-  DBUser:
-    Type: String
-    Default: admin
-  DBPassword:
-    Type: String
-    NoEcho: true
 
 Resources:
-  # Security Group para las instancias EC2
-  AppSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Security group for EC2 instances - Allow HTTP and SSH
-      VpcId: !Ref VpcId
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
-      Tags:
-        - Key: Name
-          Value: app-asg-sg
-
   LaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       ImageId: !Ref ImageId
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
-      SecurityGroups:
-        - !Ref AppSecurityGroup
+      SecurityGroups: !Ref SecurityGroupIds
+      
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          set -ex
-          exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-
           yum update -y
-          
-          # Instalar Docker
-          amazon-linux-extras install docker -y
-          systemctl enable docker
-          systemctl start docker
-          usermod -a -G docker ec2-user
-          
-          # Instalar Docker Compose
-          curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          chmod +x /usr/local/bin/docker-compose
-          ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-          
-          # Instalar git y otras herramientas
-          yum install -y git curl
-          
-          HOME_DIR=/home/ec2-user
-          REPO_DIR=$HOME_DIR/app
-
-          # Clonar repositorio (rama aws)
-          if [ ! -d "$REPO_DIR" ]; then
-            cd $HOME_DIR
-            sudo -u ec2-user git clone --branch aws --single-branch https://github.com/Samub96/Despliegue_de_una_Aplicacion_Web_Escalable_en_AWS_con_IaC.git app
-            chown -R ec2-user:ec2-user $REPO_DIR
-          else
-            cd $REPO_DIR
-            sudo -u ec2-user git pull || true
-          fi
-
-          # Configurar variables de entorno para RDS
-          cd $REPO_DIR
-          
-          # Actualizar .env del backend para RDS
-          cat > src/backend/.env <<ENV_FILE
-          DB_NAME=${DBName}
-          DB_USER=${DBUser}
-          DB_PASSWORD=${DBPassword}
-          DB_HOST=${DBEndpoint}
-          JWT_SECRET=$(openssl rand -base64 32)
-          DB_DIALECT=mysql
-          PORT=8080
-          ENV_FILE
-          chown ec2-user:ec2-user src/backend/.env
-
-          # Crear .env para docker-compose con variables de RDS
-          cat > .env <<COMPOSE_ENV
-          DB_HOST=${DBEndpoint}
-          DB_NAME=${DBName}
-          DB_USER=${DBUser}
-          DB_PASSWORD=${DBPassword}
-          JWT_SECRET=$(openssl rand -base64 32)
-          COMPOSE_ENV
-          chown ec2-user:ec2-user .env
-
-          # Usar el docker-compose.yml existente que ya funciona
-          # El docker-compose.override.yml se aplicará automáticamente para producción
-          cd $REPO_DIR
-          sudo -u ec2-user docker-compose up --build -d
-
-          # Esperar a que el backend esté listo y luego inicializar RDS
-          echo "⏳ Esperando a que el backend esté listo..."
-          sleep 30
-          
-          # Inicializar RDS con datos (si existe el script)
-          if [ -f "src/deploy/aws/init-rds.sh" ]; then
-            chmod +x src/deploy/aws/init-rds.sh
-            ./src/deploy/aws/init-rds.sh "${DBEndpoint}" "${DBUser}" "${DBPassword}" "${DBName}" || true
-          fi
-
-          # Configurar auto-start en boot
-          cat > /etc/systemd/system/ecommerce-app.service <<SERVICE_FILE
-          [Unit]
-          Description=E-commerce Application
-          Requires=docker.service
-          After=docker.service
-
-          [Service]
-          Type=oneshot
-          RemainAfterExit=yes
-          WorkingDirectory=$REPO_DIR
-          ExecStart=/usr/local/bin/docker-compose up -d
-          ExecStop=/usr/local/bin/docker-compose down
-          TimeoutStartSec=0
-          User=ec2-user
-
-          [Install]
-          WantedBy=multi-user.target
-          SERVICE_FILE
-
-          systemctl enable ecommerce-app.service
+          yum install -y httpd
+          echo "Bienvenido a la app - instancia autoscaling" > /var/www/html/index.html
+          systemctl start httpd
+          systemctl enable httpd
 
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -176,20 +58,31 @@ Resources:
       DesiredCapacity: !Ref DesiredCapacity
       TargetGroupARNs:
         - !Ref TargetGroupArn
-      HealthCheckType: ELB
-      HealthCheckGracePeriod: 300
       Tags:
         - Key: Name
-          Value: app-asg-instance
+          Value: app-asg
           PropagateAtLaunch: true
+
+  ScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      Cooldown: 300
+      ScalingAdjustment: 1
+
+  ScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AutoScalingGroupName: !Ref AutoScalingGroup
+      PolicyType: SimpleScaling
+      AdjustmentType: ChangeInCapacity
+      Cooldown: 300
+      ScalingAdjustment: -1
 
 Outputs:
   AutoScalingGroupName:
     Value: !Ref AutoScalingGroup
     Export:
       Name: project-asg-name
-  AppSecurityGroupId:
-    Description: "Security Group ID for EC2 instances"
-    Value: !Ref AppSecurityGroup
-    Export:
-      Name: project-app-sg-id

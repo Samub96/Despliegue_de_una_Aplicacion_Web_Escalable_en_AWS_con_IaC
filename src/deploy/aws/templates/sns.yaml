@@ -4,8 +4,6 @@ Description: "SNS topic para notificaciones del proyecto"
 Parameters:
   NotificationEmail:
     Type: String
-  AlertEmail:
-    Type: String
 
 Resources:
   ProjectSnsTopic:
@@ -15,8 +13,6 @@ Resources:
       Subscription:
         - Protocol: email
           Endpoint: !Ref NotificationEmail
-        - Protocol: email
-          Endpoint: !Ref AlertEmail
 
 Outputs:
   SnsTopicArn:
