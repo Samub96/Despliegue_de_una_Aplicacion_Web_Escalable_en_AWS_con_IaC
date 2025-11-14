@@ -1,106 +1,82 @@
 ```mermaid
 graph TB
-    %% Usuarios y Internet
-    Users[👥 Users] --> IGW[🌐 Internet Gateway]
-    
-    %% VPC Container
-    subgraph VPC["🏗️ VPC (10.0.0.0/16)"]
-        %% Availability Zones
-        subgraph AZ1["🏢 Availability Zone 1a"]
-            PubSub1[📡 Public Subnet<br/>10.0.1.0/24]
-            PrivSub1[🔒 Private Subnet<br/>10.0.11.0/24]
+
+    Users[Users] --> IGW[Internet Gateway]
+
+    subgraph VPC["VPC 10.0.0.0/16"]
+
+        subgraph AZ1["Availability Zone 1a"]
+            PubSub1[Public Subnet 10.0.1.0/24]
+            PrivSub1[Private Subnet 10.0.11.0/24]
         end
-        
-        subgraph AZ2["🏢 Availability Zone 1b"]  
-            PubSub2[📡 Public Subnet<br/>10.0.2.0/24]
-            PrivSub2[🔒 Private Subnet<br/>10.0.12.0/24]
+
+        subgraph AZ2["Availability Zone 1b"]
+            PubSub2[Public Subnet 10.0.2.0/24]
+            PrivSub2[Private Subnet 10.0.12.0/24]
         end
-        
-        %% ALB en subnets públicas
-        subgraph ALB_Layer["⚖️ Application Load Balancer"]
-            ALB[🔀 ALB<br/>internet-facing]
-            TG[🎯 Target Group<br/>Health Check: /]
+
+        subgraph ALB_Layer["Application Load Balancer"]
+            ALB[ALB Internet Facing]
+            TG[Target Group Health Check Root]
         end
-        
-        %% Auto Scaling Group
-        subgraph ASG_Layer["🚀 Auto Scaling Group (Min:1, Max:4)"]
-            EC2_1[🖥️ EC2 Instance 1<br/>t3.micro]
-            EC2_2[🖥️ EC2 Instance 2<br/>t3.micro] 
-            EC2_3[🖥️ EC2 Instance N<br/>t3.micro]
+
+        subgraph ASG_Layer["Auto Scaling Group Min1 Max4"]
+            EC2_1[EC2 Instance 1 t3 micro]
+            EC2_2[EC2 Instance 2 t3 micro]
+            EC2_3[EC2 Instance N t3 micro]
         end
-        
-        %% RDS en subnets privadas
-        subgraph RDS_Layer["🗄️ RDS MySQL"]
-            RDS_Primary[🗃️ Primary<br/>MySQL 8.0]
-            RDS_Standby[🗃️ Standby<br/>Multi-AZ]
+
+        subgraph RDS_Layer["RDS MySQL"]
+            RDS_Primary[RDS Primary MySQL 8]
+            RDS_Standby[RDS Standby Multi AZ]
         end
     end
-    
-    %% Docker Containers en cada instancia
-    subgraph Docker1["🐳 Docker (Instance 1)"]
-        Frontend1[🌐 nginx:80<br/>Frontend]
-        Backend1[⚙️ Node.js:8080<br/>Backend API]
+
+    subgraph Docker1["Docker Instance 1"]
+        Frontend1[Nginx Frontend 80]
+        Backend1[Node Backend 8080]
     end
-    
-    subgraph Docker2["🐳 Docker (Instance 2)"]
-        Frontend2[🌐 nginx:80<br/>Frontend]
-        Backend2[⚙️ Node.js:8080<br/>Backend API]
+
+    subgraph Docker2["Docker Instance 2"]
+        Frontend2[Nginx Frontend 80]
+        Backend2[Node Backend 8080]
     end
-    
-    %% CloudWatch & Monitoring
-    subgraph Monitoring["📊 Monitoring & Alerts"]
-        CW[📊 CloudWatch<br/>Metrics & Logs]
-        SNS[📧 SNS<br/>Email Alerts]
+
+    subgraph Monitoring["Monitoring and Alerts"]
+        CW[CloudWatch Metrics Logs]
+        SNS[SNS Email Alerts]
     end
-    
-    %% Conexiones principales
+
     IGW --> ALB
     ALB --> TG
     TG --> EC2_1
     TG --> EC2_2
     TG --> EC2_3
-    
-    %% Colocación en subnets
+
     ALB -.-> PubSub1
     ALB -.-> PubSub2
+
     EC2_1 -.-> PubSub1
     EC2_2 -.-> PubSub2
     EC2_3 -.-> PubSub1
+
     RDS_Primary -.-> PrivSub1
     RDS_Standby -.-> PrivSub2
-    
-    %% Docker containers
+
     EC2_1 --> Docker1
     EC2_2 --> Docker2
+
     Frontend1 --> Backend1
     Frontend2 --> Backend2
-    
-    %% Database connections
+
     Backend1 --> RDS_Primary
     Backend2 --> RDS_Primary
-    
-    %% Monitoring connections
+
     EC2_1 --> CW
     EC2_2 --> CW
     EC2_3 --> CW
     CW --> SNS
-    
-    %% Estilos
-    classDef vpc fill:#e1f5fe
-    classDef public fill:#c8e6c9
-    classDef private fill:#ffcdd2
-    classDef compute fill:#fff3e0
-    classDef database fill:#f3e5f5
-    classDef network fill:#e8f5e8
-    classDef docker fill:#e3f2fd
-    
-    class VPC vpc
-    class PubSub1,PubSub2 public
-    class PrivSub1,PrivSub2 private
-    class EC2_1,EC2_2,EC2_3 compute
-    class RDS_Primary,RDS_Standby database
-    class ALB,TG,IGW network
-    class Docker1,Docker2,Frontend1,Frontend2,Backend1,Backend2 docker
+
 ```
 
 ## 🏗️ Template Dependencies Flow
