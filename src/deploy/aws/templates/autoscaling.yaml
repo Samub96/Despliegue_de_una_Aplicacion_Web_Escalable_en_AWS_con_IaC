@@ -10,7 +10,7 @@ Parameters:
     Default: t3.micro
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  SecurityGroupId:
+  VpcId:
     Type: String
   SubnetIds:
     Type: CommaDelimitedList
@@ -38,6 +38,29 @@ Parameters:
     NoEcho: true
 
 Resources:
+  # Security Group para las instancias EC2
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for EC2 instances - Allow HTTP and SSH
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: app-asg-sg
+
   LaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -45,7 +68,7 @@ Resources:
       InstanceType: !Ref InstanceType
       KeyName: !Ref KeyName
       SecurityGroups:
-        - !Ref SecurityGroupId
+        - !Ref AppSecurityGroup
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
@@ -165,3 +188,8 @@ Outputs:
     Value: !Ref AutoScalingGroup
     Export:
       Name: project-asg-name
+  AppSecurityGroupId:
+    Description: "Security Group ID for EC2 instances"
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: project-app-sg-id

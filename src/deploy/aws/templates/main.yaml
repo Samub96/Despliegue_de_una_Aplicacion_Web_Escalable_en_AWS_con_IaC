@@ -65,22 +65,6 @@ Resources:
         DBUser: !Ref DBUser
         DBPassword: !Ref DBPassword
 
-  EC2Stack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - VPCStack
-      - RDSStack
-    Properties:
-      TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/ec2.yaml"
-      Parameters:
-        VpcId: !GetAtt VPCStack.Outputs.VpcId
-        PublicSubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
-        KeyName: !Ref KeyName
-        DBEndpoint: !GetAtt RDSStack.Outputs.DBEndpoint
-        DBName: !Ref DBName
-        DBUser: !Ref DBUser
-        DBPassword: !Ref DBPassword
-
   ALBStack:
     Type: AWS::CloudFormation::Stack
     DependsOn: VPCStack
@@ -99,7 +83,7 @@ Resources:
     Properties:
       TemplateURL: !Sub "https://s3.${AWS::Region}.amazonaws.com/${S3TemplateBucket}/autoscaling.yaml"
       Parameters:
-        SecurityGroupId: !GetAtt EC2Stack.Outputs.AppSecurityGroupId
+        VpcId: !GetAtt VPCStack.Outputs.VpcId
         SubnetIds: !GetAtt VPCStack.Outputs.PublicSubnetIds
         KeyName: !Ref KeyName
         TargetGroupArn: !GetAtt ALBStack.Outputs.TargetGroupArn
