@@ -1,5 +1,5 @@
 // frontend/js/cart.js
-const API_URL = "http://localhost:8080/api/cart";
+const API_URL = "/api/cart";
 const token = localStorage.getItem('token');
 
 if (!token) {

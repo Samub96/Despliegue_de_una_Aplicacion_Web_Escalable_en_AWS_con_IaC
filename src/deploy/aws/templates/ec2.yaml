@@ -94,69 +94,68 @@ Resources:
             sudo -u ec2-user git pull || true
           fi
 
-          # Crear archivo de configuración para producción
+          # Crear configuración para producción
           cd $REPO_DIR
-          cat > .env <<ENV_FILE
-          DB_HOST=${DBEndpoint}
+          
+          # Actualizar .env del backend para producción
+          cat > src/backend/.env <<ENV_FILE
           DB_NAME=${DBName}
           DB_USER=${DBUser}
           DB_PASSWORD=${DBPassword}
+          DB_HOST=${DBEndpoint}
           JWT_SECRET=$(openssl rand -base64 32)
-          NODE_ENV=production
+          DB_DIALECT=mysql
           PORT=8080
           ENV_FILE
-          chown ec2-user:ec2-user .env
+          chown ec2-user:ec2-user src/backend/.env
 
-          # Crear docker-compose para producción
+          # Crear docker-compose para producción (sin MySQL, usa RDS)
           cat > docker-compose.prod.yml <<DOCKER_COMPOSE
           version: '3.8'
+
           services:
+            # Backend API
             backend:
               build:
                 context: ./src/backend
                 dockerfile: Dockerfile
-              container_name: ecommerce_backend_prod
-              restart: always
-              environment:
-                - DB_HOST=${DBEndpoint}
-                - DB_NAME=${DBName}
-                - DB_USER=${DBUser}
-                - DB_PASSWORD=${DBPassword}
-                - DB_DIALECT=mysql
-                - JWT_SECRET=$(openssl rand -base64 32)
-                - PORT=8080
-                - NODE_ENV=production
+              container_name: ecommerce_backend
+              restart: unless-stopped
               ports:
                 - "8080:8080"
+              environment:
+                - NODE_ENV=production
+              networks:
+                - ecommerce_network
               healthcheck:
-                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+                test: ["CMD", "node", "-e", "require('http').get('http://localhost:8080', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"]
                 timeout: 10s
                 retries: 5
-                interval: 30s
-              networks:
-                - app-network
-          
+                start_period: 30s
+
+            # Frontend Web Server
             frontend:
               build:
                 context: ./src/frontend
                 dockerfile: Dockerfile
-              container_name: ecommerce_frontend_prod
-              restart: always
+              container_name: ecommerce_frontend
+              restart: unless-stopped
               ports:
                 - "80:80"
+              networks:
+                - ecommerce_network
               depends_on:
                 backend:
                   condition: service_healthy
               healthcheck:
-                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
-                timeout: 10s
+                test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+                timeout: 3s
                 retries: 3
-                interval: 30s
-              networks:
-                - app-network
-          
+                start_period: 5s
+
+          # Networks
           networks:
-            app-network:
+            ecommerce_network:
               driver: bridge
           DOCKER_COMPOSE
           chown ec2-user:ec2-user docker-compose.prod.yml
@@ -164,6 +163,14 @@ Resources:
           # Construir e iniciar aplicación
           cd $REPO_DIR
           sudo -u ec2-user docker-compose -f docker-compose.prod.yml up --build -d
+
+          # Esperar a que el backend esté listo y luego inicializar RDS
+          echo "⏳ Esperando a que el backend esté listo..."
+          sleep 30
+          
+          # Inicializar RDS con datos
+          chmod +x src/deploy/aws/init-rds.sh
+          ./src/deploy/aws/init-rds.sh "${DBEndpoint}" "${DBUser}" "${DBPassword}" "${DBName}"
 
           # Configurar auto-start en boot
           cat > /etc/systemd/system/ecommerce-app.service <<SERVICE_FILE

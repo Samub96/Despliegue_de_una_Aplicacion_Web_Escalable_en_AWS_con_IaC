@@ -1,17 +1,26 @@
+# Use nginx alpine for smaller image
 FROM nginx:alpine
 
-# Copiar archivos estáticos del frontend
-COPY . /usr/share/nginx/html/
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
 
-# Crear configuración de nginx
+# Copy nginx configuration first
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Exponer puerto 80
+# Copy frontend files (exclude nginx config and dockerfile)
+COPY --chown=nginx:nginx *.html /usr/share/nginx/html/
+COPY --chown=nginx:nginx *.css /usr/share/nginx/html/
+COPY --chown=nginx:nginx js/ /usr/share/nginx/html/js/
+
+# Set proper permissions
+RUN chown -R nginx:nginx /usr/share/nginx/html
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+
+# Expose port
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
-
-# El CMD por defecto de nginx es suficiente
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

@@ -24,16 +24,34 @@ Resources:
   DBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "SG RDS MySQL"
+      GroupDescription: "SG RDS MySQL - permite acceso desde VPC"
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3306
           ToPort: 3306
           CidrIp: 10.0.0.0/16
+          Description: "Acceso MySQL desde toda la VPC"
       Tags:
         - Key: Name
           Value: rds-mysql-sg
+
+  DBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Family: mysql8.0
+      Description: "Parámetros MySQL para compatibilidad con Node.js"
+      Parameters:
+        default_authentication_plugin: mysql_native_password
+        character_set_server: utf8mb4
+        collation_server: utf8mb4_unicode_ci
+        innodb_buffer_pool_size: "{DBInstanceClassMemory*3/4}"
+        max_connections: "100"
+        slow_query_log: "1"
+        long_query_time: "2"
+      Tags:
+        - Key: Name
+          Value: mysql-custom-params
 
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
@@ -62,6 +80,9 @@ Resources:
       StorageType: gp2
       DeletionProtection: false
       MultiAZ: false
+      DBParameterGroupName: !Ref DBParameterGroup
+      StorageEncrypted: true
+      MonitoringInterval: 0
     DeletionPolicy: Delete
 
 Outputs:

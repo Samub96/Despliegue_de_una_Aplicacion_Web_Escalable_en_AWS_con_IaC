@@ -7,10 +7,7 @@ const { sequelize, Product } = require('./models');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors({ 
-  origin: process.env.NODE_ENV === 'production' ? true : 'http://127.0.0.1:5500', 
-  credentials: true 
-}));
+app.use(cors({ origin: 'http://127.0.0.1:5500', credentials: true }));
 
 app.use(express.json());
 app.use('/api/auth', require('./routes/auth'));
@@ -19,7 +16,7 @@ app.use('/api/cart', require('./routes/Cart'));
 app.use('/api/checkout', require('./routes/checkout'));
 
 app.get('/', (req, res) => res.json({ message: 'OK' }));
-app.get('/api/health', (req, res) => res.json({ status: 'healthy', timestamp: new Date() }));
+app.get('/health', (req, res) => res.json({ status: 'healthy', timestamp: new Date().toISOString() }));
 
 (async () => {
     try {

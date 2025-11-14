@@ -1,2 +1,13 @@
 # Ignorar cualquier carpeta llamada secrets
 **/secrets/
+
+# Variables de entorno locales (mantener .env.example)
+.env
+
+# Logs
+*.log
+logs/
+
+# Datos de desarrollo
+node_modules/
+.DS_Store

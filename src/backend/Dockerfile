@@ -1,43 +1,39 @@
-# Multi-stage build para optimizar tamaño de imagen
-FROM node:18-alpine AS builder
+# Use Node.js Alpine for smaller image
+FROM node:18-alpine
 
-# Crear directorio de trabajo
+# Install build dependencies for native modules (including bcrypt)
+RUN apk add --no-cache python3 make g++ libc6-compat
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs && adduser -S appuser -u 1001 -G nodejs
+
+# Set working directory
 WORKDIR /app
 
-# Copiar archivos de dependencias
+# Copy package files first (for better layer caching)
 COPY package*.json ./
 
-# Instalar dependencias de producción solamente
-RUN npm ci --only=production --no-audit --no-fund
+# Remove any existing node_modules and package-lock to force fresh install
+RUN rm -rf node_modules package-lock.json
 
-# Etapa de producción
-FROM node:18-alpine AS production
+# Install dependencies fresh (this will compile bcrypt for Alpine Linux)
+RUN npm install --only=production
 
-# Crear usuario no-root para seguridad
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+# Copy application code (node_modules is excluded via .dockerignore)
+COPY . .
 
-# Directorio de trabajo
-WORKDIR /app
+# Change ownership to non-root user
+RUN chown -R appuser:nodejs /app
 
-# Copiar dependencias desde builder
-COPY --from=builder /app/node_modules ./node_modules
+# Switch to non-root user
+USER appuser
 
-# Copiar código fuente
-COPY --chown=nodejs:nodejs . .
-
-# Crear directorio para logs
-RUN mkdir -p /app/logs && chown nodejs:nodejs /app/logs
-
-# Cambiar a usuario no-root
-USER nodejs
-
-# Exponer puerto
+# Expose port
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
 
-# Comando para ejecutar la aplicación
+# Start application
 CMD ["node", "server.js"]
