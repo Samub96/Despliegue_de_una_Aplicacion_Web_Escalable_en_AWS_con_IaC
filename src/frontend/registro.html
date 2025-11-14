@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <title>Registro</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body class="auth-bg">
+
+  <main class="auth-center">
+
+    <section class="auth-card">
+      <h2>Crear una cuenta ✨</h2>
+      <p class="subtitle">Regístrate para empezar a gestionar tu catálogo.</p>
+
+      <form id="regForm">
+
+        <label>Nombre de usuario</label>
+        <input id="regUser" required placeholder="Tu nombre">
+
+        <label>Correo electrónico</label>
+        <input id="regEmail" type="email" required placeholder="correo@ejemplo.com">
+
+        <label>Contraseña</label>
+        <input id="regPass" type="password" required placeholder="********">
+
+        <button class="btn-primary" type="submit">Crear Cuenta</button>
+      </form>
+
+      <a class="switch-link" href="login.html">¿Ya tienes cuenta? Iniciar sesión</a>
+
+      <p id="message" class="message"></p>
+    </section>
+
+  </main>
+
+  <script>
+    const API_URL = '/api/auth';
+    const message = document.getElementById('message');
+
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('regUser').value;
+      const email = document.getElementById('regEmail').value;
+      const password = document.getElementById('regPass').value;
+
+      try {
+        const regRes = await fetch(`${API_URL}/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password })
+        });
+
+        const regData = await regRes.json();
+
+        if (!regRes.ok) {
+          message.style.color = 'red';
+          message.textContent = regData.message || 'Error en el registro.';
+          return;
+        }
+
+        const loginRes = await fetch(`${API_URL}/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const loginData = await loginRes.json();
+
+        if (loginRes.ok && loginData.token) {
+          localStorage.setItem('token', loginData.token);
+          window.location.href = "catalogo.html";
+        } else {
+          message.style.color = 'red';
+          message.textContent = 'Registro exitoso. Inicia sesión.';
+          setTimeout(() => window.location.href = "login.html", 1200);
+        }
+
+      } catch (err) {
+        console.error(err);
+        message.style.color = 'red';
+        message.textContent = 'Error de conexión.';
+      }
+    });
+  </script>
+
+</body>
+
+</html>

@@ -10,7 +10,7 @@ document.getElementById && (function () {
       const username = document.getElementById('loginUser').value.trim();
       const password = document.getElementById('loginPass').value.trim();
       try {
-        const res = await apiFetch('/auth/login', { method: 'POST', body: { username, password }});
+        const res = await apiFetch('/auth/login', { method: 'POST', body: { username, password } });
         setToken(res.token);
         message.style.color = 'green';
         message.innerText = 'Ingreso exitoso. Redirigiendo...';
@@ -29,7 +29,7 @@ document.getElementById && (function () {
       const username = document.getElementById('regUser').value.trim();
       const password = document.getElementById('regPass').value.trim();
       try {
-        await apiFetch('/auth/register', { method: 'POST', body: { username, password }});
+        await apiFetch('/auth/register', { method: 'POST', body: { username, password } });
         message.style.color = 'green';
         message.innerText = 'Usuario creado. Inicia sesión.';
       } catch (err) {
@@ -39,4 +39,4 @@ document.getElementById && (function () {
       }
     });
   }
-})();
+})(document);

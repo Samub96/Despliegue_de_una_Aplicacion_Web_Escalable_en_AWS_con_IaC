@@ -1,5 +1,5 @@
 // Configuración básica del frontend para comunicar con backend
-const API_BASE = 'http://localhost:8080/api';
+const API_BASE = '/api';
 
 function getToken() {
   return localStorage.getItem('token');

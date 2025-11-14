@@ -16,6 +16,7 @@ app.use('/api/cart', require('./routes/Cart'));
 app.use('/api/checkout', require('./routes/checkout'));
 
 app.get('/', (req, res) => res.json({ message: 'OK' }));
+app.get('/health', (req, res) => res.json({ status: 'healthy', timestamp: new Date().toISOString() }));
 
 (async () => {
     try {
